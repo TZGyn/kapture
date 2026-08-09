@@ -97,7 +97,7 @@ final class OverlayView: NSView {
 
         let border = NSBezierPath(rect: sel)
         border.lineWidth = 1.5
-        NSColor.systemOrange.setStroke()
+        NSColor.controlAccentColor.setStroke()
         border.stroke()
 
         let label = "\(Int(sel.width)) × \(Int(sel.height))"

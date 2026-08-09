@@ -8,7 +8,7 @@ BIN=".build/release/Kapture"
 APP="Kapture.app"
 CERT="kapture-dev"
 
-if ! security find-identity -v -p codesigning 2>/dev/null | grep -q "\"$CERT\""; then
+if ! security find-identity -p codesigning 2>/dev/null | grep -q "kapture-dev"; then
     echo "Creating self-signed code signing identity '$CERT' (one-time)..."
     TMP=$(mktemp -d)
     trap 'rm -rf "$TMP"' EXIT

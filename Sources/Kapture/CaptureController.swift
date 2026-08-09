@@ -62,21 +62,16 @@ final class CaptureController: NSObject {
         guard let image = ScreenCapture.capture(rect) else {
             isSelecting = false
             restorePreviousApp()
-            ResultWindow.shared.show("Capture failed. Check Screen Recording permission.")
+            Task { @MainActor in
+                ResultWindow.shared.show(image: ResultWindow.failureImage("Capture failed. Check Screen Recording permission."))
+            }
             return
         }
-        OCRService.shared.recognize(image) { [weak self] text in
-            DispatchQueue.main.async {
-                self?.isSelecting = false
-                self?.restorePreviousApp()
-                if text.isEmpty {
-                    ResultWindow.shared.show("No text found in the selected area.")
-                } else {
-                    let pasteboard = NSPasteboard.general
-                    pasteboard.clearContents()
-                    pasteboard.setString(text, forType: .string)
-                    ResultWindow.shared.show(text)
-                }
+        DispatchQueue.main.async { [weak self] in
+            self?.isSelecting = false
+            self?.restorePreviousApp()
+            Task { @MainActor in
+                ResultWindow.shared.show(image: image)
             }
         }
     }
