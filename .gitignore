@@ -1,0 +1,13 @@
+# SwiftPM
+.build/
+.swiftpm/
+
+# App bundle (build artifact, regenerate with ./build-app.sh)
+Kapture.app/
+
+# macOS
+.DS_Store
+
+# Xcode
+xcuserdata/
+DerivedData/
