@@ -55,6 +55,8 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
     <string>Kapture</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
+    <key>CFBundleIconFile</key>
+    <string>Icon</string>
     <key>CFBundleShortVersionString</key>
     <string>1.0</string>
     <key>CFBundleVersion</key>
@@ -68,6 +70,11 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
 </dict>
 </plist>
 PLIST
+
+codesign --force --sign "$CERT" "$APP"
+
+chmod +x scripts/make-icon.sh
+./scripts/make-icon.sh
 
 codesign --force --sign "$CERT" "$APP"
 

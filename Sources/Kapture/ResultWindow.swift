@@ -158,7 +158,7 @@ struct ResultView: View {
                 Spacer()
                 Button("Save PNG…") { model.savePNG() }
                 Button("Get Text") { model.runOCR() }
-                    .disabled(model.isOCRRunning || model.extractedText != nil || model.mode == .text)
+                    .disabled(model.isOCRRunning || model.extractedText != nil)
                 Button("Close") { onClose() }
             }
             .padding(.horizontal, 12)
