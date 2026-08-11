@@ -11,3 +11,5 @@ Kapture.app/
 # Xcode
 xcuserdata/
 DerivedData/
+dist/
+
