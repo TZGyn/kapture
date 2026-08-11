@@ -13,6 +13,7 @@ No network calls, no API keys — everything runs locally.
 
 - Global hotkey **⌘⇧S** works from any app
 - Region selection overlay (all screens, Escape cancels)
+- **Launch at Login** toggle in the menu bar
 - The screenshot appears in a window (Screenshot / Text tabs) instead of being
   instantly OCR'd
 - **Get Text** button runs on-device OCR (English, Chinese simplified/traditional,
@@ -33,6 +34,11 @@ Releases are published as zips on GitHub Releases; `release.sh` packages a
 new one (`./release.sh 1.0.1 && git tag v1.0.1 && git push origin v1.0.1`).
 The cask lives in the [TZGyn/homebrew-tap](https://github.com/TZGyn/homebrew-tap)
 repository — bump the `version` and `sha256` there for each release.
+
+Note: builds are ad-hoc signed (no App Store / Developer ID notarization), so
+first launch of a new version may trigger a Gatekeeper warning — users can
+right-click → Open, or the warning goes away when the binary identity matches a
+previously-granted permission.
 
 ## Build & run
 

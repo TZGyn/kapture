@@ -1,6 +1,7 @@
 import SwiftUI
 import AppKit
 import CoreGraphics
+import ServiceManagement
 
 @main
 struct KaptureApp: App {
@@ -47,6 +48,19 @@ struct MenuView: View {
 
         Divider()
 
+        Button(LoginItem.isEnabled ? "Disable Launch at Login" : "Launch at Login") {
+            if !LoginItem.toggle() {
+                let alert = NSAlert()
+                alert.messageText = "Could not update Launch at Login"
+                alert.informativeText = "Launch at Login requires a signed app bundle in /Applications. It is not available when running via `swift run`."
+                alert.alertStyle = .warning
+                alert.addButton(withTitle: "OK")
+                alert.runModal()
+            }
+        }
+
+        Divider()
+
         Button("Quit Kapture") { NSApp.terminate(nil) }
             .keyboardShortcut("q")
     }
@@ -57,6 +71,26 @@ enum PermissionManager {
 
     static func request() {
         CGRequestScreenCaptureAccess()
+    }
+}
+
+enum LoginItem {
+    static var isEnabled: Bool {
+        SMAppService.mainApp.status == .enabled
+    }
+
+    static func toggle() -> Bool {
+        let service = SMAppService.mainApp
+        do {
+            if service.status == .enabled {
+                try service.unregister()
+            } else {
+                try service.register()
+            }
+            return true
+        } catch {
+            return false
+        }
     }
 }
 

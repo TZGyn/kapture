@@ -12,6 +12,26 @@ KEYCHAIN="$SIGN_DIR/signing.keychain-db"
 KCHAIN_PASS="kapture-dev"
 mkdir -p "$SIGN_DIR"
 
+# Prefer a Developer ID Application identity (login keychain) so the app gets
+# clean Gatekeeper behavior; fall back to the self-signed "kapture-dev" identity.
+# Resolve by keychain path to avoid ambiguous matches.
+DEV_IDENT=""
+if command -v security >/dev/null 2>&1; then
+    DEV_IDENT=$(security find-identity -v -p codesigning 2>/dev/null | awk '/Developer ID Application:/ { print $2; exit }')
+fi
+SIGN_KEYCHAIN=""
+if [ -n "$DEV_IDENT" ]; then
+    CERT="$DEV_IDENT"
+    echo "Using Developer ID identity: $CERT"
+    # Sign from the login keychain where the Dev ID lives.
+    SIGN_KEYCHAIN=""
+else
+    CERT="kapture-dev"
+    echo "Using self-signed identity 'kapture-dev'"
+    SIGN_KEYCHAIN="$KEYCHAIN"
+fi
+DEV_IDENT="${DEV_IDENT:-}"  # ensure set for later use
+
 if [ ! -f "$KEYCHAIN" ]; then
     security create-keychain -p "$KCHAIN_PASS" "$KEYCHAIN" 2>/dev/null
     security set-keychain-settings -lut 86400 "$KEYCHAIN"
@@ -86,9 +106,9 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
     <key>CFBundleIconFile</key>
     <string>Icon</string>
     <key>CFBundleShortVersionString</key>
-    <string>1.0</string>
+    <string>1.1.0</string>
     <key>CFBundleVersion</key>
-    <string>1</string>
+    <string>10</string>
     <key>LSUIElement</key>
     <true/>
     <key>NSHighResolutionCapable</key>
@@ -102,6 +122,14 @@ PLIST
 chmod +x scripts/make-icon.sh
 ./scripts/make-icon.sh
 
-codesign --force --sign "$CERT" --keychain "$KEYCHAIN" "$APP"
+if [ -n "$SIGN_KEYCHAIN" ]; then
+    codesign --force --sign "$CERT" --keychain "$SIGN_KEYCHAIN" "$APP"
+else
+    codesign --force --sign "$CERT" "$APP"
+fi
 
-echo "Built $APP (signed with stable identity '$CERT') — drag to /Applications or run: open $APP"
+if [ -n "$DEV_IDENT" ]; then
+    echo "Built $APP (signed with Developer ID '$CERT') — drag to /Applications or run: open $APP"
+else
+    echo "Built $APP (signed with stable identity '$CERT') — drag to /Applications or run: open $APP"
+fi

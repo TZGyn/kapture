@@ -5,24 +5,44 @@ import UniformTypeIdentifiers
 final class ResultWindow {
     static let shared = ResultWindow()
 
-    private var window: NSWindow?
+    private var windows: [NSWindow] = []
+    private var nextOrigin = NSPoint(x: 60, y: 60)
+    private var openCount = 0
 
     @MainActor
     func show(image: CGImage) {
-        window?.close()
         let model = CaptureModel(image: image)
-        let hosting = NSHostingController(rootView: ResultView(model: model) { [weak self] in
-            self?.window?.close()
+        let w = NSWindow()
+        w.contentViewController = NSHostingController(rootView: ResultView(model: model) {
+            w.close()
         })
-        let w = NSWindow(contentViewController: hosting)
-        w.title = "Kapture — Screenshot"
+        w.title = "Kapture — Screenshot" + (openCount > 0 ? " \(openCount + 1)" : "")
         w.level = .floating
         w.styleMask = [.titled, .closable, .resizable]
         w.setContentSize(NSSize(width: 694, height: 520))
         w.isReleasedWhenClosed = false
-        w.center()
+        w.setFrameOrigin(nextOrigin)
         w.makeKeyAndOrderFront(nil)
-        window = w
+
+        windows.append(w)
+        openCount += 1
+        nextOrigin = NSPoint(x: nextOrigin.x + 28, y: nextOrigin.y - 28)
+
+        windowCleanup(for: w)
+    }
+
+    private func windowCleanup(for window: NSWindow) {
+        NotificationCenter.default.addObserver(
+            forName: NSWindow.willCloseNotification,
+            object: window,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in
+                guard let self else { return }
+                self.windows.removeAll { $0 === window }
+                self.openCount = max(0, self.openCount - 1)
+            }
+        }
     }
 
     @MainActor
@@ -115,6 +135,13 @@ final class CaptureModel: ObservableObject {
         statusMessage = "Copied to clipboard."
     }
 
+    func copyImage() {
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        pasteboard.writeObjects([NSImage(cgImage: image, size: .zero)])
+        statusMessage = "Image copied to clipboard."
+    }
+
     func savePNG() {
         let panel = NSSavePanel()
         panel.allowedContentTypes = [.png]
@@ -156,6 +183,7 @@ struct ResultView: View {
                 .pickerStyle(.segmented)
                 .fixedSize()
                 Spacer()
+                Button("Copy Image") { model.copyImage() }
                 Button("Save PNG…") { model.savePNG() }
                 Button("Get Text") { model.runOCR() }
                     .disabled(model.isOCRRunning || model.extractedText != nil)

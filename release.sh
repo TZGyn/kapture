@@ -18,4 +18,4 @@ shasum -a 256 dist/Kapture.zip
 echo
 echo "Tag and release with:"
 echo "  git tag v$VERSION && git push origin v$VERSION"
-echo "The GitHub Actions release workflow will upload dist/Kapture.zip automatically."
+echo "Attach dist/Kapture.zip to the GitHub release manually."
