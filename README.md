@@ -21,6 +21,19 @@ No network calls, no API keys — everything runs locally.
 - Open an existing image file (or drag) via the menu bar icon
 - Menu bar icon with permission status
 
+## Install with Homebrew
+
+```bash
+brew tap TZGyn/tap
+brew trust TZGyn/tap          # Homebrew 6+ requires trusting third-party taps
+brew install --cask kapture
+```
+
+Releases are published as zips on GitHub Releases; `release.sh` packages a
+new one (`./release.sh 1.0.1 && git tag v1.0.1 && git push origin v1.0.1`).
+The cask lives in the [TZGyn/homebrew-tap](https://github.com/TZGyn/homebrew-tap)
+repository — bump the `version` and `sha256` there for each release.
+
 ## Build & run
 
 ```bash
