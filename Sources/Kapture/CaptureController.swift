@@ -180,12 +180,12 @@ final class ScreenCapture {
                 config.height = Int(CGFloat(display.height) * backingScale)
                 config.showsCursor = true
 
-                // ScreenCaptureKit's Y axis is flipped relative to AppKit
-                // NSScreen frames. Convert the selection into SCDisplay space
-                // using the matching NSScreen's top edge, then crop there.
+                // ScreenCaptureKit uses a different origin than AppKit for
+                // screens stacked around the main display: per-display,
+                // SCDisplay y = appKitY - NSScreen.maxY + SCDisplay.maxY.
                 let scRect = CGRect(
                     x: rect.minX,
-                    y: screen.frame.maxY - rect.maxY + display.frame.minY,
+                    y: rect.minY - screen.frame.maxY + display.frame.maxY,
                     width: rect.width,
                     height: rect.height
                 )
