@@ -86,8 +86,10 @@ final class ScreenCapture {
 
     @available(macOS 14.0, *)
     private func crop(_ image: CGImage, to rect: NSRect, display: SCDisplay) -> CGImage? {
-        let scaleX = CGFloat(display.width) / display.frame.width
-        let scaleY = CGFloat(display.height) / display.frame.height
+        // Scale from the actual captured image dimensions, which reflect the
+        // stream's pixel output (retina => 2x, non-retina => 1x).
+        let scaleX = CGFloat(image.width) / display.frame.width
+        let scaleY = CGFloat(image.height) / display.frame.height
         let cgRect = CGRect(
             x: rect.minX,
             y: rect.minY,
@@ -133,8 +135,13 @@ final class ScreenCapture {
                 let excluded = content.windows.filter { excludedSet.contains($0.windowID) }
                 let filter = SCContentFilter(display: display, excludingWindows: excluded)
                 let config = SCStreamConfiguration()
-                config.width = Int(display.width)
-                config.height = Int(display.height)
+                // width/height are in points. Use the display's backing scale so
+                // retina captures come out at full pixel resolution.
+                let backingScale = NSScreen.screens.first(where: { $0.frame.contains(
+                    NSPoint(x: rect.midX, y: rect.midY)
+                ) })?.backingScaleFactor ?? 2
+                config.width = Int(display.frame.width * backingScale)
+                config.height = Int(display.frame.height * backingScale)
                 config.showsCursor = true
 
                 guard let image = try? await SCScreenshotManager.captureImage(contentFilter: filter, configuration: config) else {
