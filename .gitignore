@@ -5,6 +5,9 @@
 # App bundle (build artifact, regenerate with ./build-app.sh)
 Kapture.app/
 
+# Secrets
+*.p8
+
 # macOS
 .DS_Store
 

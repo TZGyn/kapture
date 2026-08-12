@@ -23,8 +23,10 @@ SIGN_KEYCHAIN=""
 if [ -n "$DEV_IDENT" ]; then
     CERT="$DEV_IDENT"
     echo "Using Developer ID identity: $CERT"
-    # Sign from the login keychain where the Dev ID lives.
-    SIGN_KEYCHAIN=""
+    # Ensure the login keychain holding the Dev ID is unlocked & accessible.
+    security unlock-keychain "$HOME/Library/Keychains/login.keychain-db" 2>/dev/null || true
+    security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "" "$HOME/Library/Keychains/login.keychain-db" >/dev/null 2>&1 || true
+    SIGN_KEYCHAIN="$HOME/Library/Keychains/login.keychain-db"
 else
     CERT="kapture-dev"
     echo "Using self-signed identity 'kapture-dev'"
@@ -123,7 +125,7 @@ chmod +x scripts/make-icon.sh
 ./scripts/make-icon.sh
 
 if [ -n "$SIGN_KEYCHAIN" ]; then
-    codesign --force --sign "$CERT" --keychain "$SIGN_KEYCHAIN" "$APP"
+    codesign --force --options runtime --sign "$CERT" --keychain "$SIGN_KEYCHAIN" "$APP"
 else
     codesign --force --sign "$CERT" "$APP"
 fi
