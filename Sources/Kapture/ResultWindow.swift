@@ -193,12 +193,16 @@ struct ResultView: View {
             .padding(.top, 10)
 
             if model.mode == .screenshot {
-                Image(nsImage: NSImage(cgImage: model.image, size: .zero))
-                    .resizable()
-                    .interpolation(.none)
-                    .aspectRatio(contentMode: .fit)
-                    .border(Color.secondary.opacity(0.4))
-                    .padding(.horizontal, 12)
+                GeometryReader { geo in
+                    let imageWidth = CGFloat(model.image.width)
+                    Image(nsImage: NSImage(cgImage: model.image, size: .zero))
+                        .resizable()
+                        // Downscale with smoothing (AA); upscale keeps pixels crisp.
+                        .interpolation(imageWidth >= geo.size.width ? .high : .none)
+                        .aspectRatio(contentMode: .fit)
+                }
+                .border(Color.secondary.opacity(0.4))
+                .padding(.horizontal, 12)
             } else {
                 ZStack(alignment: .bottomTrailing) {
                     ScrollView {
