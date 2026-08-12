@@ -48,6 +48,13 @@ struct MenuView: View {
 
         Divider()
 
+        Button("Copy Diagnostics") {
+            let diag = CaptureController.shared.diagnostics()
+            let pasteboard = NSPasteboard.general
+            pasteboard.clearContents()
+            pasteboard.setString(diag, forType: .string)
+        }
+
         Button(LoginItem.isEnabled ? "Disable Launch at Login" : "Launch at Login") {
             if !LoginItem.toggle() {
                 let alert = NSAlert()

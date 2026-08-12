@@ -10,6 +10,38 @@ final class CaptureController: NSObject {
     private var previousApp: NSRunningApplication?
     private var overlayIDs: [Int] = []
 
+    /// Diagnostic snapshot for "Copy Diagnostics" menu item.
+    func diagnostics() -> String {
+        var lines: [String] = []
+        lines.append("Kapture diagnostics")
+        for (i, s) in NSScreen.screens.enumerated() {
+            let scale = s.backingScaleFactor
+            let cgID = (s.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber)?.uint32Value ?? 0
+            lines.append("screen[\(i)]: frame=\(s.frame) scale=\(scale) backingSize=\(s.frame.width*scale)x\(s.frame.height*scale) cgID=\(cgID)")
+        }
+        if #available(macOS 14.0, *) {
+            Task {
+                if let content = try? await SCShareableContent.current {
+                    for (i, d) in content.displays.enumerated() {
+                        lines.append("SCDisplay[\(i)]: frame=\(d.frame) width=\(d.width)x\(d.height) id=\(d.displayID)")
+                    }
+                } else {
+                    lines.append("SCShareableContent: unavailable (no Screen Recording permission?)")
+                }
+                let text = lines.joined(separator: "\n")
+                let pb = NSPasteboard.general
+                pb.clearContents()
+                pb.setString(text, forType: .string)
+            }
+        } else {
+            let text = lines.joined(separator: "\n")
+            let pb = NSPasteboard.general
+            pb.clearContents()
+            pb.setString(text, forType: .string)
+        }
+        return lines.joined(separator: "\n")
+    }
+
     func begin() {
         guard !isSelecting else { return }
         guard PermissionManager.isGranted else {
