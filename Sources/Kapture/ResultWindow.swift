@@ -88,6 +88,8 @@ final class CaptureModel: ObservableObject {
     @Published var extractedText: String?
     @Published var isOCRRunning = false
     @Published var statusMessage: String?
+    /// Drag selection rect in IMAGE point space (nil = none)
+    @Published var selection: CGRect?
 
     enum CaptureMode {
         case screenshot
@@ -98,24 +100,43 @@ final class CaptureModel: ObservableObject {
         self.image = image
     }
 
+    var hasSelection: Bool { selection != nil && selection!.width >= 2 && selection!.height >= 2 }
+
     var displayText: String {
         if isOCRRunning {
             return "Recognizing text…"
         }
-        return extractedText ?? "Text appears here — click “Get Text”."
+        return extractedText ?? "Select text in the screenshot, then click “Get Text”."
     }
 
-    func runOCR() {
+    func cropImage(to rectInImage: CGRect) -> CGImage? {
+        return image.cropping(to: rectInImage)
+    }
+
+    func runOCR(over selectionOnly: CGRect? = nil) {
         guard !isOCRRunning else { return }
         isOCRRunning = true
         statusMessage = nil
-        OCRService.shared.recognize(image) { [weak self] text in
+
+        let targetImage: CGImage
+        if let sel = selectionOnly {
+            guard let cropped = image.cropping(to: sel) else {
+                self.isOCRRunning = false
+                self.statusMessage = "Selection too small."
+                return
+            }
+            targetImage = cropped
+        } else {
+            targetImage = image
+        }
+
+        OCRService.shared.recognize(targetImage) { [weak self] text in
             Task { @MainActor in
                 guard let self else { return }
                 self.isOCRRunning = false
                 self.mode = .text
                 if text.isEmpty {
-                    self.extractedText = "No text found in the screenshot."
+                    self.extractedText = "No text found in the selection."
                 } else {
                     self.extractedText = text
                     let pasteboard = NSPasteboard.general
@@ -125,6 +146,11 @@ final class CaptureModel: ObservableObject {
                 }
             }
         }
+    }
+
+    func runOCRSelection() {
+        guard let sel = selection, hasSelection else { return }
+        runOCR(over: sel)
     }
 
     func copyText() {
@@ -185,24 +211,23 @@ struct ResultView: View {
                 Spacer()
                 Button("Copy Image") { model.copyImage() }
                 Button("Save PNG…") { model.savePNG() }
-                Button("Get Text") { model.runOCR() }
-                    .disabled(model.isOCRRunning || model.extractedText != nil)
+                if model.hasSelection {
+                    Button("Get Selection Text") { model.runOCRSelection() }
+                        .disabled(model.isOCRRunning)
+                        .help("Recognize text inside the selected region")
+                }
+                Button("Get All Text") { model.runOCR() }
+                    .disabled(model.isOCRRunning)
+                    .help("Recognize all text in the screenshot")
                 Button("Close") { onClose() }
             }
             .padding(.horizontal, 12)
             .padding(.top, 10)
 
             if model.mode == .screenshot {
-                GeometryReader { geo in
-                    let imageWidth = CGFloat(model.image.width)
-                    Image(nsImage: NSImage(cgImage: model.image, size: .zero))
-                        .resizable()
-                        // Downscale with smoothing (AA); upscale keeps pixels crisp.
-                        .interpolation(imageWidth >= geo.size.width ? .high : .none)
-                        .aspectRatio(contentMode: .fit)
-                }
-                .border(Color.secondary.opacity(0.4))
-                .padding(.horizontal, 12)
+                ScreenshotPane(model: model)
+                    .border(Color.secondary.opacity(0.4))
+                    .padding(.horizontal, 12)
             } else {
                 ZStack(alignment: .bottomTrailing) {
                     ScrollView {
@@ -239,5 +264,85 @@ struct ResultView: View {
         }
         .padding(.bottom, 10)
         .frame(minWidth: 480, minHeight: 380)
+    }
+}
+
+struct ScreenshotPane: View {
+    @ObservedObject var model: CaptureModel
+
+    private var imageSize: CGSize {
+        CGSize(width: model.image.width, height: model.image.height)
+    }
+
+    private func geometry(for geo: GeometryProxy) -> (scale: CGFloat, drawSize: CGSize, origin: CGPoint) {
+        let size = imageSize
+        let scale = min(geo.size.width / size.width, geo.size.height / size.height)
+        let drawSize = CGSize(width: size.width * scale, height: size.height * scale)
+        let origin = CGPoint(
+            x: (geo.size.width - drawSize.width) / 2,
+            y: (geo.size.height - drawSize.height) / 2
+        )
+        return (scale, drawSize, origin)
+    }
+
+    private func toImagePoint(_ viewPoint: CGPoint, scale: CGFloat, origin: CGPoint) -> CGPoint {
+        CGPoint(
+            x: (viewPoint.x - origin.x) / scale,
+            y: (viewPoint.y - origin.y) / scale
+        )
+    }
+
+    private func clampSelection(_ rect: CGRect) -> CGRect {
+        rect.intersection(CGRect(origin: .zero, size: imageSize))
+    }
+
+    var body: some View {
+        GeometryReader { geo in
+            let (scale, drawSize, origin) = geometry(for: geo)
+
+            ZStack {
+                Image(nsImage: NSImage(cgImage: model.image, size: .zero))
+                    .resizable()
+                    .interpolation(imageSize.width >= geo.size.width ? .high : .none)
+                    .aspectRatio(contentMode: .fit)
+                    .frame(width: drawSize.width, height: drawSize.height)
+                    .position(x: origin.x + drawSize.width / 2, y: origin.y + drawSize.height / 2)
+
+                if let sel = model.selection {
+                    let viewRect = CGRect(
+                        x: origin.x + sel.minX * scale,
+                        y: origin.y + sel.minY * scale,
+                        width: sel.width * scale,
+                        height: sel.height * scale
+                    )
+                    Rectangle()
+                        .fill(Color.accentColor.opacity(0.15))
+                        .border(Color.accentColor, width: 1.5)
+                        .frame(width: viewRect.width, height: viewRect.height)
+                        .position(x: viewRect.midX, y: viewRect.midY)
+                        .allowsHitTesting(false)
+                }
+            }
+            .contentShape(Rectangle())
+            .gesture(
+                DragGesture(minimumDistance: 0)
+                    .onChanged { value in
+                        let start = toImagePoint(value.startLocation, scale: scale, origin: origin)
+                        let current = toImagePoint(value.location, scale: scale, origin: origin)
+                        let rect = CGRect(
+                            x: min(start.x, current.x),
+                            y: min(start.y, current.y),
+                            width: abs(current.x - start.x),
+                            height: abs(current.y - start.y)
+                        )
+                        model.selection = clampSelection(rect)
+                    }
+                    .onEnded { _ in
+                        if let s = model.selection, (s.width < 2 || s.height < 2) {
+                            model.selection = nil
+                        }
+                    }
+            )
+        }
     }
 }
