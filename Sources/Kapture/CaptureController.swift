@@ -86,10 +86,12 @@ final class ScreenCapture {
 
     @available(macOS 14.0, *)
     private func crop(_ image: CGImage, to rect: NSRect, display: SCDisplay) -> CGImage? {
-        // Scale from the actual captured image dimensions, which reflect the
-        // stream's pixel output (retina => 2x, non-retina => 1x).
+        // The captured image may be at any scale (retina 2x, secondary display
+        // 1x, or trimmed by ScreenCaptureKit). Derive the pixel scale from the
+        // image we actually got, relative to the display's point frame.
         let scaleX = CGFloat(image.width) / display.frame.width
         let scaleY = CGFloat(image.height) / display.frame.height
+        guard scaleX > 0, scaleY > 0 else { return nil }
         let cgRect = CGRect(
             x: rect.minX,
             y: rect.minY,
@@ -102,14 +104,18 @@ final class ScreenCapture {
             width: cgRect.width * scaleX,
             height: cgRect.height * scaleY
         )
+        // Guard against negative offsets when the selection reaches beyond the
+        // display's frame (e.g. secondary monitor coordinate quirks).
+        let safeRect = pxRect.intersection(CGRect(x: 0, y: 0, width: CGFloat(image.width), height: CGFloat(image.height)))
+        guard safeRect.width >= 1, safeRect.height >= 1 else { return nil }
         guard let cropCtx = CGContext(
-            data: nil, width: Int(pxRect.width), height: Int(pxRect.height),
+            data: nil, width: Int(safeRect.width), height: Int(safeRect.height),
             bitsPerComponent: 8, bytesPerRow: 0,
             space: CGColorSpaceCreateDeviceRGB(),
             bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
         ) else { return nil }
         cropCtx.interpolationQuality = .high
-        cropCtx.draw(image, in: CGRect(x: -pxRect.minX, y: -pxRect.minY, width: CGFloat(image.width), height: CGFloat(image.height)))
+        cropCtx.draw(image, in: CGRect(x: -safeRect.minX, y: -safeRect.minY, width: CGFloat(image.width), height: CGFloat(image.height)))
         return cropCtx.makeImage()
     }
 
@@ -135,13 +141,10 @@ final class ScreenCapture {
                 let excluded = content.windows.filter { excludedSet.contains($0.windowID) }
                 let filter = SCContentFilter(display: display, excludingWindows: excluded)
                 let config = SCStreamConfiguration()
-                // width/height are in points. Use the display's backing scale so
-                // retina captures come out at full pixel resolution.
-                let backingScale = NSScreen.screens.first(where: { $0.frame.contains(
-                    NSPoint(x: rect.midX, y: rect.midY)
-                ) })?.backingScaleFactor ?? 2
-                config.width = Int(display.frame.width * backingScale)
-                config.height = Int(display.frame.height * backingScale)
+                // display.width/height are pixels; request the display's full
+                // native resolution so ScreenCaptureKit gives us every pixel.
+                config.width = Int(display.width)
+                config.height = Int(display.height)
                 config.showsCursor = true
 
                 guard let image = try? await SCScreenshotManager.captureImage(contentFilter: filter, configuration: config) else {
