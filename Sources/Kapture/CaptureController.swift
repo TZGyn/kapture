@@ -117,19 +117,13 @@ final class ScreenCapture {
     private init() {}
 
     @available(macOS 14.0, *)
-    private func crop(_ image: CGImage, to rect: NSRect, display: SCDisplay) -> CGImage? {
-        // The captured image may be at any scale (retina 2x, secondary display
-        // 1x, or trimmed by ScreenCaptureKit). Derive the pixel scale from the
-        // image we actually got, relative to the display's point frame.
+    private func crop(_ image: CGImage, to cgRect: CGRect, display: SCDisplay) -> CGImage? {
+        // cgRect is already in SCDisplay space (Y flipped relative to AppKit).
+        // Derive the pixel scale from the image we actually got, relative to
+        // the display's point frame.
         let scaleX = CGFloat(image.width) / display.frame.width
         let scaleY = CGFloat(image.height) / display.frame.height
         guard scaleX > 0, scaleY > 0 else { return nil }
-        let cgRect = CGRect(
-            x: rect.minX,
-            y: rect.minY,
-            width: rect.width,
-            height: rect.height
-        )
         let pxRect = CGRect(
             x: (cgRect.minX - display.frame.minX) * scaleX,
             y: (cgRect.minY - display.frame.minY) * scaleY,
@@ -177,18 +171,30 @@ final class ScreenCapture {
                 // width/height are output PIXELS. Multiply by the backing scale
                 // of the screen containing the selection so retina displays are
                 // captured at full resolution and 1x displays stay 1x.
-                let backingScale = NSScreen.screens
-                    .first(where: { $0.frame.contains(NSPoint(x: rect.midX, y: rect.midY)) })?
-                    .backingScaleFactor ?? 1
+                guard let screen = NSScreen.screens.first(where: { $0.frame.contains(NSPoint(x: rect.midX, y: rect.midY)) }) else {
+                    completion(nil)
+                    return
+                }
+                let backingScale = screen.backingScaleFactor
                 config.width = Int(CGFloat(display.width) * backingScale)
                 config.height = Int(CGFloat(display.height) * backingScale)
                 config.showsCursor = true
+
+                // ScreenCaptureKit's Y axis is flipped relative to AppKit
+                // NSScreen frames. Convert the selection into SCDisplay space
+                // using the matching NSScreen's top edge, then crop there.
+                let scRect = CGRect(
+                    x: rect.minX,
+                    y: screen.frame.maxY - rect.maxY + display.frame.minY,
+                    width: rect.width,
+                    height: rect.height
+                )
 
                 guard let image = try? await SCScreenshotManager.captureImage(contentFilter: filter, configuration: config) else {
                     completion(nil)
                     return
                 }
-                completion(self.crop(image, to: rect, display: display))
+                completion(self.crop(image, to: scRect, display: display))
             }
         } else {
             guard let primary = NSScreen.screens.first(where: { $0.frame.origin == .zero }) ?? NSScreen.screens.first else {

@@ -108,9 +108,9 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
     <key>CFBundleIconFile</key>
     <string>Icon</string>
     <key>CFBundleShortVersionString</key>
-    <string>1.1.6</string>
+    <string>1.1.7</string>
     <key>CFBundleVersion</key>
-    <string>16</string>
+    <string>17</string>
     <key>LSUIElement</key>
     <true/>
     <key>NSHighResolutionCapable</key>
