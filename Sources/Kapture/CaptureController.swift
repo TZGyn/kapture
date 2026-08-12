@@ -141,10 +141,15 @@ final class ScreenCapture {
                 let excluded = content.windows.filter { excludedSet.contains($0.windowID) }
                 let filter = SCContentFilter(display: display, excludingWindows: excluded)
                 let config = SCStreamConfiguration()
-                // display.width/height are pixels; request the display's full
-                // native resolution so ScreenCaptureKit gives us every pixel.
-                config.width = Int(display.width)
-                config.height = Int(display.height)
+                // SCDisplay.width/height are in POINTS; SCStreamConfiguration
+                // width/height are output PIXELS. Multiply by the backing scale
+                // of the screen containing the selection so retina displays are
+                // captured at full resolution and 1x displays stay 1x.
+                let backingScale = NSScreen.screens
+                    .first(where: { $0.frame.contains(NSPoint(x: rect.midX, y: rect.midY)) })?
+                    .backingScaleFactor ?? 1
+                config.width = Int(CGFloat(display.width) * backingScale)
+                config.height = Int(CGFloat(display.height) * backingScale)
                 config.showsCursor = true
 
                 guard let image = try? await SCScreenshotManager.captureImage(contentFilter: filter, configuration: config) else {
