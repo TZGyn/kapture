@@ -195,6 +195,7 @@ struct ResultView: View {
             if model.mode == .screenshot {
                 Image(nsImage: NSImage(cgImage: model.image, size: .zero))
                     .resizable()
+                    .interpolation(.none)
                     .aspectRatio(contentMode: .fit)
                     .border(Color.secondary.opacity(0.4))
                     .padding(.horizontal, 12)
