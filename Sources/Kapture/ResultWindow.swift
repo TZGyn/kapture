@@ -197,73 +197,117 @@ struct ResultView: View {
     let onClose: () -> Void
 
     var body: some View {
-        VStack(spacing: 10) {
-            HStack {
+        VStack(spacing: 0) {
+            // Toolbar
+            HStack(spacing: 10) {
                 Picker("", selection: $model.mode) {
                     Text("Screenshot").tag(CaptureModel.CaptureMode.screenshot)
                     Text("Text").tag(CaptureModel.CaptureMode.text)
-                    if model.isOCRRunning {
-                        Text("…").tag(CaptureModel.CaptureMode.text)
-                    }
                 }
                 .pickerStyle(.segmented)
                 .fixedSize()
-                Spacer()
-                Button("Copy Image") { model.copyImage() }
-                Button("Save PNG…") { model.savePNG() }
-                if model.hasSelection {
-                    Button("Get Selection Text") { model.runOCRSelection() }
-                        .disabled(model.isOCRRunning)
-                        .help("Recognize text inside the selected region")
-                }
-                Button("Get All Text") { model.runOCR() }
-                    .disabled(model.isOCRRunning)
-                    .help("Recognize all text in the screenshot")
-                Button("Close") { onClose() }
-            }
-            .padding(.horizontal, 12)
-            .padding(.top, 10)
 
+                Spacer()
+
+                if model.hasSelection {
+                    Button {
+                        model.runOCRSelection()
+                    } label: {
+                        Label("OCR Selection", systemImage: "text.magnifyingglass")
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(model.isOCRRunning)
+                    .help("Recognize text inside the selected region")
+                }
+
+                Button {
+                    model.runOCR()
+                } label: {
+                    Label("Get All Text", systemImage: "text.viewfinder")
+                }
+                .buttonStyle(.bordered)
+                .disabled(model.isOCRRunning)
+                .help("Recognize all text in the screenshot")
+
+                Divider().frame(height: 18)
+
+                Button {
+                    model.copyImage()
+                } label: {
+                    Label("Copy", systemImage: "doc.on.doc")
+                }
+                .buttonStyle(.bordered)
+                .help("Copy image to clipboard")
+
+                Button {
+                    model.savePNG()
+                } label: {
+                    Label("Save", systemImage: "square.and.arrow.down")
+                }
+                .buttonStyle(.bordered)
+                .help("Save screenshot as PNG");
+
+                Button {
+                    onClose()
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+                .help("Close")
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+
+            Divider()
+
+            // Content
             if model.mode == .screenshot {
                 ScreenshotPane(model: model)
-                    .border(Color.secondary.opacity(0.4))
-                    .padding(.horizontal, 12)
+                    .padding(12)
             } else {
-                ZStack(alignment: .bottomTrailing) {
+                ZStack {
                     ScrollView {
                         Text(model.displayText)
-                            .font(.system(.body))
+                            .font(.system(.body, design: .monospaced))
                             .textSelection(.enabled)
                             .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(8)
+                            .padding(12)
                     }
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 6)
-                            .stroke(Color.secondary.opacity(0.4))
-                    )
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
 
-                    HStack(spacing: 8) {
-                        if let msg = model.statusMessage {
-                            Text(msg)
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                        }
-                        Button("Copy Text") { model.copyText() }
+            // Status bar
+            HStack(spacing: 8) {
+                if model.isOCRRunning {
+                    ProgressView()
+                        .controlSize(.small)
+                }
+                Text(model.statusMessage ?? (model.mode == .screenshot
+                    ? (model.hasSelection ? "Region selected — click OCR Selection." : "Drag to select a region, or Get All Text.")
+                    : "Selectable text"))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+
+                Spacer()
+
+                if model.mode == .text, model.extractedText != nil {
+                    Button {
+                        model.copyText()
+                    } label: {
+                        Label("Copy Text", systemImage: "doc.on.doc")
                     }
-                    .padding(8)
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
                 }
             }
-
-            if model.statusMessage != nil && model.mode == .screenshot {
-                Text(model.statusMessage!)
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, 12)
-            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 8)
+            .background(.bar)
         }
-        .padding(.bottom, 10)
-        .frame(minWidth: 480, minHeight: 380)
+        .frame(minWidth: 520, minHeight: 420)
     }
 }
 
